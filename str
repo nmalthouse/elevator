@@ -1,0 +1,17 @@
+v = a * t + v0
+
+(v - v0) / a = t
+
+
+a 
+
+v = at + v0
+
+x = (1/2)at^2 + v0t + x0
+
+
+x = vt + x0
+
+brake_mark = vt + x0
+
+(brake_mark - x0 ) /v = t
