@@ -1,9 +1,12 @@
 const std = @import("std");
 const Alloc = std.mem.Allocator;
 const Vec = std.ArrayList;
-const c = @cImport(
-    @cInclude("raylib.h"),
-);
+const graph = @import("graph");
+const Dctx = graph.NewCtx;
+const Rect = graph.Rect;
+const Rec = graph.Rec;
+const Vec2f = graph.Vec2f;
+const Colors = graph.Colori;
 
 pub fn pow(x: f32, y: f32) f32 {
     return std.math.pow(f32, x, y);
@@ -504,14 +507,6 @@ pub const Elevator = struct {
     }
 };
 
-pub fn raylibPrint(x: i32, y: i32, color: c.Color, size: i32, comptime fmt: []const u8, data: anytype) !void {
-    var _buf: [256]u8 = undefined;
-    var fbs = std.io.FixedBufferStream([]u8){ .buffer = &_buf, .pos = 0 };
-    try fbs.writer().print(fmt, data);
-    try fbs.writer().writeByte(0);
-    c.DrawText(@as([*c]u8, @ptrCast(fbs.getWritten())), x, y, size, color);
-}
-
 test "Elevator common" {
     const floors = [_]Elevator.FloorMapItem{ .{}, .{ .rel_y = 0.5 }, .{ .rel_y = 2 }, .{}, .{} };
     var p: f32 = 0;
@@ -527,12 +522,12 @@ test "Elevator common" {
     std.debug.print("{d}, {d}\n", .{ po, di });
 }
 
-pub fn draw_hall_call_indicator(pos: c.Vector2, up: bool, down: bool) void {
-    c.DrawTriangle(pos, .{ .x = pos.x - 10, .y = pos.y - 20 }, .{ .x = pos.x - 20, .y = pos.y }, if (up) c.ORANGE else c.WHITE);
-    c.DrawTriangle(.{ .x = pos.x, .y = pos.y + 5 }, .{ .x = pos.x - 20, .y = pos.y + 5 }, .{ .x = pos.x - 10, .y = pos.y + 5 + 20 }, if (down) c.ORANGE else c.WHITE);
+pub fn draw_hall_call_indicator(draw: *Dctx, pos: Vec2f, up: bool, down: bool) void {
+    draw.triangle(pos, .{ .x = pos.x - 10, .y = pos.y - 20 }, .{ .x = pos.x - 20, .y = pos.y }, if (up) Colors.Orange else Colors.White);
+    draw.triangle(.{ .x = pos.x, .y = pos.y + 5 }, .{ .x = pos.x - 20, .y = pos.y + 5 }, .{ .x = pos.x - 10, .y = pos.y + 5 + 20 }, if (down) Colors.Orange else Colors.White);
 }
 
-pub fn draw_cab_call_indicator(pos: c.Vector2, cab_calls: *const BitSetT, elevator: *Elevator) void {
+pub fn draw_cab_call_indicator(win: *const graph.SDL.Window, draw: *Dctx, pos: Vec2f, cab_calls: *const BitSetT, elevator: *Elevator) void {
     const w = 5;
 
     const wt = 20;
@@ -541,22 +536,22 @@ pub fn draw_cab_call_indicator(pos: c.Vector2, cab_calls: *const BitSetT, elevat
 
     var i: usize = 0;
     while (i < cab_calls.unmanaged.bit_length) : (i += 1) {
-        const rect: c.Rectangle = .{
+        const rect: Rect = .{
             .x = pos.x + @as(f32, @floatFromInt(i % w)) * @as(f32, @floatFromInt(pad + wt)),
             .y = pos.y + @as(f32, @floatFromInt(i / w)) * @as(f32, @floatFromInt(pad * ht)),
-            .width = 20,
-            .height = 20,
+            .w = 20,
+            .h = 20,
         };
-        if (hasMouseClickedInArea(rect)) {
+        if (hasMouseClickedInArea(win, rect)) {
             elevator.cabCall(i);
         }
-        c.DrawRectangleRec(rect, if (cab_calls.isSet(i)) c.RED else c.BLACK);
+        draw.rect(rect, if (cab_calls.isSet(i)) Colors.Red else Colors.Black);
     }
 }
 
-pub fn hasMouseClickedInArea(area: c.Rectangle) bool {
-    if (c.IsMouseButtonPressed(0)) {
-        return c.CheckCollisionPointRec(c.GetMousePosition(), area);
+pub fn hasMouseClickedInArea(win: *const graph.SDL.Window, area: Rect) bool {
+    if (win.mouse.left == .rising) {
+        return graph.rectContainsPoint(area, win.mouse.pos);
     }
     return false;
 }
@@ -564,6 +559,16 @@ pub fn hasMouseClickedInArea(area: c.Rectangle) bool {
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const alloc = gpa.allocator();
+
+    var win = try graph.SDL.Window.createWindow("Elevator", .{});
+    defer win.destroyWindow();
+
+    var draw = graph.NewCtx.init(alloc, win.getDpi());
+    defer draw.deinit();
+
+    var dpix: u32 = @as(u32, @intFromFloat(win.getDpi()));
+    var font = try graph.Font.init("the_engine/fonts/sfmono.otf", alloc, 12, dpix, &(graph.Font.CharMaps.AsciiBasic ++ graph.Font.CharMaps.Apple), null);
+    defer font.deinit();
 
     var xorsh = std.rand.DefaultPrng.init(0);
     var rand = xorsh.random();
@@ -603,81 +608,77 @@ pub fn main() !void {
         }
     }
 
-    c.InitWindow(1500, 2000, "test");
-    c.SetTargetFPS(60);
-
-    while (!c.WindowShouldClose()) {
+    while (!win.should_exit) {
+        try draw.begin(Colors.Gray);
+        win.pumpEvents();
         elevator.update_phys(0.16);
         for (agents.items) |*item| {
             item.update(0.16, &elevator);
         }
         {
-            if (c.IsKeyPressed(c.KEY_A)) {
+            if (win.keyPressed(.A)) {
                 elevator.phys_state = .accel;
             }
-            if (c.IsKeyPressed(c.KEY_B)) {
+            if (win.keyPressed(.B)) {
                 elevator.phys_state = .brake;
-            }
-
-            var k = c.GetKeyPressed();
-            while (k != 0) : (k = c.GetKeyPressed()) {
-                switch (k) {
-                    c.KEY_ZERO...c.KEY_NINE => {
-                        const floor_num = k - c.KEY_ZERO;
-                        elevator.cabCall(@as(usize, @intCast(floor_num)));
-                        //elevator.target_floor = @intCast(usize, floor_num);
-                    },
-                    else => {},
-                }
             }
         }
 
-        c.BeginDrawing();
-        c.ClearBackground(c.GRAY);
         {
-            draw_cab_call_indicator(.{ .x = 400, .y = 70 }, &elevator.cab_calls, &elevator);
+            draw_cab_call_indicator(&win, &draw, .{ .x = 400, .y = 70 }, &elevator.cab_calls, &elevator);
             var y: f32 = 0;
             const sfy = 70;
             for (elevator.floor_map.items, 0..) |floor, i| {
-                const pos = c.Vector2{ .x = 40, .y = floor.rel_y * sfy };
+                const pos = Vec2f{ .x = 40, .y = floor.rel_y * sfy };
                 draw_hall_call_indicator(
+                    &draw,
                     .{ .x = pos.x, .y = y + (floor.rel_y / 2) * sfy },
                     elevator.hall_calls_up.isSet(i),
                     elevator.hall_calls_down.isSet(i),
                 );
-                if (hasMouseClickedInArea(.{ .x = pos.x - 20, .y = y + (floor.rel_y / 2) * sfy - 20, .width = 20, .height = 20 })) {
-                    elevator.hallCall(i, .up);
-                }
-                if (hasMouseClickedInArea(.{ .x = pos.x - 20, .y = y + (floor.rel_y / 2) * sfy + 5, .width = 20, .height = 20 })) {
-                    elevator.hallCall(i, .down);
-                }
-                const color = if (i % 2 == 0) c.WHITE else c.BLACK;
-                c.DrawRectangleV(.{ .x = sfy, .y = y }, pos, color);
-                try raylibPrint(@as(i32, @intFromFloat(sfy + pos.x + 10)), @as(i32, @intFromFloat(y + (floor.rel_y * sfy / 3))), c.DARKGRAY, 40, "{d}", .{i});
+                //if (hasMouseClickedInArea( Rec( pos.x - 20,  y + (floor.rel_y / 2) * sfy - 20,  20,  20, )) {
+                //    elevator.hallCall(i, .up);
+                //}
+                //if (hasMouseClickedInArea(Rec( pos.x - 20, y + (floor.rel_y / 2) * sfy + 5, 20, 20 ,)) {
+                //    elevator.hallCall(i, .down);
+                //}
+                const color: u32 = if (i % 2 == 0) Colors.White else Colors.Black;
+                draw.rectV(.{ .x = sfy, .y = y }, pos, color);
+                draw.textFmt(
+                    Vec2f.new(sfy + pos.x + 10, y + floor.rel_y * sfy / 3),
+                    "{d}",
+                    .{i},
+                    &font,
+                    12,
+                    Colors.DarkGray,
+                );
                 y += floor.rel_y * sfy;
             }
 
-            c.DrawRectangleV(.{ .x = sfy + 8, .y = 0 }, .{ .x = 4, .y = elevator.position * sfy }, c.BLACK);
-            c.DrawRectangleV(.{ .x = sfy, .y = elevator.position * sfy - (sfy / 2) }, .{ .x = 20, .y = sfy / 2 }, c.BLUE);
+            draw.rectV(.{ .x = sfy + 8, .y = 0 }, .{ .x = 4, .y = elevator.position * sfy }, Colors.Black);
+            draw.rectV(.{ .x = sfy, .y = elevator.position * sfy - (sfy / 2) }, .{ .x = 20, .y = sfy / 2 }, Colors.Blue);
             {
                 for (agents.items) |agent| {
                     switch (agent.state) {
                         .elevating => {},
                         else => {
-                            c.DrawRectangleV(.{ .x = agent.x + 68, .y = Elevator.getAbsoluteFloorPosition(elevator.floor_map.items, agent.floor_i) * sfy }, .{ .x = 10, .y = 10 }, c.PURPLE);
+                            draw.rectV(.{ .x = agent.x + 68, .y = Elevator.getAbsoluteFloorPosition(elevator.floor_map.items, agent.floor_i) * sfy }, .{ .x = 10, .y = 10 }, Colors.Purple);
                         },
                     }
                 }
             }
         }
-        try raylibPrint(
-            300,
-            40,
-            c.BLACK,
-            20,
+        draw.textFmt(
+            Vec2f.new(0, 72),
             "{any}, {any}, {any}, {any}",
             .{ elevator.phys_state, elevator.last_direction, elevator.target_floor, elevator.parked_at },
+            &font,
+            12,
+            Colors.Black,
         );
-        c.EndDrawing();
+
+        //draw.rect(Rec(0, 0, 1000, 1000), 0xff00ffff);
+        draw.end(win.screen_width, win.screen_height, graph.za.Mat4.identity());
+        win.swap();
     }
 }
