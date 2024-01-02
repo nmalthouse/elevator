@@ -566,8 +566,11 @@ pub fn main() !void {
     var draw = graph.NewCtx.init(alloc, win.getDpi());
     defer draw.deinit();
 
+    var windir = try std.fs.cwd().openDir("the_engine", .{});
     var dpix: u32 = @as(u32, @intFromFloat(win.getDpi()));
-    var font = try graph.Font.init("the_engine/fonts/sfmono.otf", alloc, 12, dpix, &(graph.Font.CharMaps.AsciiBasic ++ graph.Font.CharMaps.Apple), null);
+    var font = try graph.Font.init(alloc, windir, "fonts/sfmono.otf", 12, dpix, .{
+        .debug_dir = std.fs.cwd(),
+    });
     defer font.deinit();
 
     var xorsh = std.rand.DefaultPrng.init(0);
@@ -669,7 +672,7 @@ pub fn main() !void {
             }
         }
         draw.textFmt(
-            Vec2f.new(0, 72),
+            Vec2f.new(0, 0),
             "{any}, {any}, {any}, {any}",
             .{ elevator.phys_state, elevator.last_direction, elevator.target_floor, elevator.parked_at },
             &font,
