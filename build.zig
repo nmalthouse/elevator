@@ -1,5 +1,5 @@
 const std = @import("std");
-const graph = @import("the_engine/build.zig");
+const graph = @import("ratgraph/build.zig");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});

@@ -1,3 +1,3 @@
-[submodule "the_engine"]
-	path = the_engine
-	url = gitlab:/nmalthouse/the_engine.git
+[submodule "ratgraph"]
+	path = ratgraph
+	url = https://github.com/nmalthouse/ratgraph

@@ -566,15 +566,17 @@ pub fn main() !void {
     var draw = graph.NewCtx.init(alloc, win.getDpi());
     defer draw.deinit();
 
-    var windir = try std.fs.cwd().openDir("the_engine", .{});
+    var windir = try std.fs.cwd().openDir("ratgraph", .{});
     var dpix: u32 = @as(u32, @intFromFloat(win.getDpi()));
-    var font = try graph.Font.init(alloc, windir, "fonts/sfmono.otf", 12, dpix, .{
+    var font = try graph.Font.init(alloc, windir, "fonts/roboto.ttf", 12, dpix, .{
         .debug_dir = std.fs.cwd(),
     });
     defer font.deinit();
 
     var xorsh = std.rand.DefaultPrng.init(0);
     var rand = xorsh.random();
+
+    const smoke_location = .{ .floor = @as(usize, 5), .x = @as(f32, 400) };
 
     var elevator = try Elevator.init(alloc, &[_]Elevator.FloorMapItem{
         .{},
@@ -612,7 +614,7 @@ pub fn main() !void {
     }
 
     while (!win.should_exit) {
-        try draw.begin(Colors.Gray);
+        try draw.begin(Colors.Gray, win.screen_dimensions.toF());
         win.pumpEvents();
         elevator.update_phys(0.16);
         for (agents.items) |*item| {
@@ -657,6 +659,7 @@ pub fn main() !void {
                 );
                 y += floor.rel_y * sfy;
             }
+            draw.rect(Rec(smoke_location.x, Elevator.getAbsoluteFloorPosition(elevator.floor_map.items, smoke_location.floor) * sfy, 40, 40), Colors.Black);
 
             draw.rectV(.{ .x = sfy + 8, .y = 0 }, .{ .x = 4, .y = elevator.position * sfy }, Colors.Black);
             draw.rectV(.{ .x = sfy, .y = elevator.position * sfy - (sfy / 2) }, .{ .x = 20, .y = sfy / 2 }, Colors.Blue);
@@ -681,7 +684,7 @@ pub fn main() !void {
         );
 
         //draw.rect(Rec(0, 0, 1000, 1000), 0xff00ffff);
-        draw.end(win.screen_width, win.screen_height, graph.za.Mat4.identity());
+        try draw.end();
         win.swap();
     }
 }
