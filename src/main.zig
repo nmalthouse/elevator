@@ -2,7 +2,7 @@ const std = @import("std");
 const Alloc = std.mem.Allocator;
 const Vec = std.ArrayList;
 const graph = @import("graph");
-const Dctx = graph.NewCtx;
+const Dctx = graph.ImmediateDrawingContext;
 const Rect = graph.Rect;
 const Rec = graph.Rec;
 const Vec2f = graph.Vec2f;
@@ -551,7 +551,7 @@ pub fn draw_cab_call_indicator(win: *const graph.SDL.Window, draw: *Dctx, pos: V
 
 pub fn hasMouseClickedInArea(win: *const graph.SDL.Window, area: Rect) bool {
     if (win.mouse.left == .rising) {
-        return graph.rectContainsPoint(area, win.mouse.pos);
+        return area.containsPoint(win.mouse.pos);
     }
     return false;
 }
@@ -563,12 +563,11 @@ pub fn main() !void {
     var win = try graph.SDL.Window.createWindow("Elevator", .{});
     defer win.destroyWindow();
 
-    var draw = graph.NewCtx.init(alloc, win.getDpi());
+    var draw = Dctx.init(alloc, win.getDpi());
     defer draw.deinit();
 
     var windir = try std.fs.cwd().openDir("ratgraph", .{});
-    var dpix: u32 = @as(u32, @intFromFloat(win.getDpi()));
-    var font = try graph.Font.init(alloc, windir, "fonts/roboto.ttf", 12, dpix, .{
+    var font = try graph.Font.init(alloc, windir, "fonts/roboto.ttf", 12, win.getDpi(), .{
         .debug_dir = std.fs.cwd(),
     });
     defer font.deinit();
