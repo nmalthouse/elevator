@@ -1,5 +1,4 @@
 const std = @import("std");
-const graph = @import("ratgraph/build.zig");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -13,9 +12,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const module = graph.module(b, exe);
-    exe.addModule("graph", module);
-
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
@@ -24,6 +20,10 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+
+    const ratdep = b.dependency("ratgraph", .{ .target = target, .optimize = optimize });
+    const ratmod = ratdep.module("ratgraph");
+    exe.root_module.addImport("graph", ratmod);
 
     const unit_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },

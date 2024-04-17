@@ -36,11 +36,11 @@ pub const Agent = struct {
     }
 
     pub fn isAtGoalX(self: *const Self) bool {
-        return (@fabs(self.goal_x - self.x) < 0.1);
+        return (@abs(self.goal_x - self.x) < 0.1);
     }
 
     pub fn isAtElevatorX(self: *const Self) bool {
-        return @fabs(self.x - elevator_x) < 0.1;
+        return @abs(self.x - elevator_x) < 0.1;
     }
 
     pub fn update(self: *@This(), dt: f32, elevator: *Elevator) void {
@@ -67,7 +67,7 @@ pub const Agent = struct {
                 if (!self.isOnGoalFloor()) {
                     if (!self.isAtElevatorX()) { //Walk to elevator
                         const sf: f32 = if (self.x > elevator_x) -1.0 else 1.0;
-                        const max_dt = @fabs((elevator_x - self.x) / speed);
+                        const max_dt = @abs((elevator_x - self.x) / speed);
                         self.x += sf * speed;
                         const new_sf: f32 = if (self.x > elevator_x) -1.0 else 1.0;
                         if (new_sf * sf < 0) {
@@ -86,7 +86,7 @@ pub const Agent = struct {
                     if (!self.isAtGoalX()) {
                         const g = self.goal_x;
                         const sf: f32 = if (self.x > g) -1.0 else 1.0;
-                        const max_dt = @fabs((g - self.x) / speed);
+                        const max_dt = @abs((g - self.x) / speed);
                         self.x += sf * speed;
                         const new_sf: f32 = if (self.x > g) -1.0 else 1.0;
                         if (new_sf * sf < 0) {
@@ -240,8 +240,8 @@ pub const Elevator = struct {
                 i += 1;
             }
         };
-        const gtd = @fabs(apos - pos);
-        const ltd = @fabs(lt - pos);
+        const gtd = @abs(apos - pos);
+        const ltd = @abs(lt - pos);
         return if (gtd < ltd) i else i - 1;
     }
 
@@ -361,7 +361,7 @@ pub const Elevator = struct {
                     const d = self.last_direction;
                     sf = if (d == .up) -1.0 else 1.0;
                 }
-                const absv = @fabs(self.velocity);
+                const absv = @abs(self.velocity);
                 if (absv > self.speed_limit) unreachable;
                 const max_dt = (self.speed_limit - absv) / accel;
 
@@ -378,7 +378,7 @@ pub const Elevator = struct {
                 }
             },
             .brake => {
-                const absv = @fabs(self.velocity);
+                const absv = @abs(self.velocity);
                 if (absv == 0) unreachable;
                 if (absv > self.speed_limit) unreachable;
                 const max_dt = (absv) / brake;
@@ -437,7 +437,7 @@ pub const Elevator = struct {
                         }
                     }
 
-                    const dxt = @fabs(target_pos - self.position);
+                    const dxt = @abs(target_pos - self.position);
                     const dist_before_brake = dxt - brake_dist;
 
                     const maxdt = (dist_before_brake / self.speed_limit);
@@ -456,7 +456,7 @@ pub const Elevator = struct {
                     //Determine what floor we are parked at;
                     const nearest_i = getNearestFloor(self.floor_map.items, self.position);
                     const abs_p = getAbsoluteFloorPosition(self.floor_map.items, nearest_i);
-                    self.parked_at = if (@fabs(self.position - abs_p) < leveling_error) nearest_i else null;
+                    self.parked_at = if (@abs(self.position - abs_p) < leveling_error) nearest_i else null;
                 }
 
                 if (self.velocity != 0) unreachable;
@@ -472,7 +472,7 @@ pub const Elevator = struct {
 
                 if (self.target_floor) |target_floor| {
                     const absfloor = getAbsoluteFloorPosition(self.floor_map.items, target_floor);
-                    if (@fabs(absfloor - self.position) < leveling_error) { //TODO is this needed?
+                    if (@abs(absfloor - self.position) < leveling_error) { //TODO is this needed?
                         self.hall_calls_up.unset(self.target_floor.?);
                         self.hall_calls_down.unset(self.target_floor.?);
                         self.cab_calls.unset(self.target_floor.?);
@@ -482,7 +482,7 @@ pub const Elevator = struct {
                     }
 
                     const floor_pos = getAbsoluteFloorPosition(self.floor_map.items, target_floor);
-                    self.speed_limit = calculate_speed_limit(@fabs(self.position - floor_pos));
+                    self.speed_limit = calculate_speed_limit(@abs(self.position - floor_pos));
 
                     self.phys_state = .accel;
                     self.last_direction = if (absfloor > self.position) .down else .up;
@@ -566,7 +566,7 @@ pub fn main() !void {
     var draw = Dctx.init(alloc, win.getDpi());
     defer draw.deinit();
 
-    var windir = try std.fs.cwd().openDir("ratgraph", .{});
+    const windir = try std.fs.cwd().openDir("ratgraph", .{});
     var font = try graph.Font.init(alloc, windir, "fonts/roboto.ttf", 12, win.getDpi(), .{
         .debug_dir = std.fs.cwd(),
     });
